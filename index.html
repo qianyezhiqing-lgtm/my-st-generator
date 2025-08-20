@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>My ST Generator</title>
-    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai/dist/index.js"></script>
+    <script src="https://unpkg.com/@google/generative-ai"></script>
     <style>
         body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
         .container { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
@@ -86,9 +86,27 @@
                     throw new Error('Could not find JSON in response.');
                 }
             } catch (error) {
-                console.error('Generation error:', error);
-                document.getElementById('status').innerText = `Error: ${error.message || 'Failed to generate. Please check your API key and try again.'}`;
-                document.getElementById('status').className = 'error';
+    console.error('Full Generation error:', error);
+    
+    // 详细错误分析
+    let errorMsg = 'Error: ';
+    if (error.message.includes('API key') || error.message.includes('key')) {
+        errorMsg += 'API密钥无效或未设置。请检查Netlify环境变量配置。';
+    } else if (error.message.includes('network') || error.message.includes('Load') || error.message.includes('fetch')) {
+        errorMsg += '网络问题：无法加载AI库或连接到Google服务。请检查网络连接或尝试更换网络。';
+    } else if (error.message.includes('JSON')) {
+        errorMsg += 'AI返回的数据格式不正确。';
+    } else if (error.message.includes('quota') || error.message.includes('limit')) {
+        errorMsg += 'API配额已用尽或受限。';
+    } else {
+        errorMsg += `${error.message || '未知错误，请检查控制台。'}`;
+    }
+    
+    document.getElementById('status').innerText = errorMsg;
+    document.getElementById('status').className = 'error';
+} finally {
+    document.getElementById('generateBtn').disabled = false;
+}
             } finally {
                 document.getElementById('generateBtn').disabled = false;
             }
