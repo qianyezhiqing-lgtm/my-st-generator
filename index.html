@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My ST Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai/dist/index.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f5f5f5; }
+        .container { background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: #333; }
+        textarea, input[type="text"] { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; font-size: 16px; }
+        button { background-color: #4CAF50; color: white; padding: 12px 20px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; width: 100%; margin: 5px 0; }
+        button:hover { background-color: #45a049; }
+        #copyBtn { background-color: #008CBA; }
+        #copyBtn:hover { background-color: #007B9E; }
+        #status { margin-top: 15px; padding: 10px; border-radius: 5px; text-align: center; }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>My ST Character Generator</h1>
+        <p><strong>Instructions:</strong> Click GENERATE to create a character. Edit any field as needed, then copy the JSON to use in SillyTavern.</p>
+        
+        <button onclick="generateCharacter()" id="generateBtn">GENERATE</button>
+        
+        <div id="inputs">
+            <input type="text" id="name" placeholder="Name">
+            <textarea id="description" rows="3" placeholder="Description"></textarea>
+            <textarea id="personality" rows="2" placeholder="Personality"></textarea>
+            <textarea id="scenario" rows="2" placeholder="Scenario"></textarea>
+            <textarea id="first_mes" rows="2" placeholder="Greeting Message"></textarea>
+            <textarea id="mes_example" rows="3" placeholder="Dialogue Examples ( separated by {{}} )"></textarea>
+        </div>
+        
+        <button onclick="copyToClipboard()" id="copyBtn">COPY JSON</button>
+        
+        <div id="status"></div>
+    </div>
+
+    <script>
+        // !!! 重要：你的API密钥将通过Netlify的环境变量注入，这里不需要直接写死 !!!
+        const API_KEY = import.meta.env?.VITE_GOOGLE_API_KEY || alert("API Key not configured. Please set VITE_GOOGLE_API_KEY environment variable in Netlify.");
+
+        async function generateCharacter() {
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('status').className = '';
+            document.getElementById('status').innerText = 'Generating...';
+
+            const genAI = new generativeAI.GoogleGenerativeAI(API_KEY);
+            const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+
+            // 构建一个更精确的提示词
+            const prompt = `Generate a detailed character card for a text-based RPG game in the style of SillyTavern. 
+            Create a completely random and original character. Provide the response ONLY as a valid JSON object with the following exact fields and nothing else:
+            {
+              "name": "[Random creative name]",
+              "description": "[A vivid 1-2 sentence physical description and overarching vibe]",
+              "personality": "[A list of 3-4 key personality traits, e.g., Brave, Cynical, Curious]",
+              "scenario": "[A 1-sentence setup or context for the roleplay]",
+              "first_mes": "[The character's first message to the user, in character, 1-2 sentences]",
+              "mes_example": "[Two example dialogue exchanges between the user and the character, formatted exactly like this: {{user::How are you?}}{{char::I've been better.}}]"
+            }`;
+
+            try {
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                const text = response.text();
+
+                // 尝试从返回的文本中提取JSON
+                const jsonMatch = text.match(/\{[\s\S]*\}/);
+                if (jsonMatch) {
+                    const charData = JSON.parse(jsonMatch[0]);
+                    // 用生成的数据填充表单
+                    document.getElementById('name').value = charData.name || '';
+                    document.getElementById('description').value = charData.description || '';
+                    document.getElementById('personality').value = charData.personality || '';
+                    document.getElementById('scenario').value = charData.scenario || '';
+                    document.getElementById('first_mes').value = charData.first_mes || '';
+                    document.getElementById('mes_example').value = charData.mes_example || '';
+                    document.getElementById('status').innerText = 'Generation successful!';
+                    document.getElementById('status').className = 'success';
+                } else {
+                    throw new Error('Could not find JSON in response.');
+                }
+            } catch (error) {
+                console.error('Generation error:', error);
+                document.getElementById('status').innerText = `Error: ${error.message || 'Failed to generate. Please check your API key and try again.'}`;
+                document.getElementById('status').className = 'error';
+            } finally {
+                document.getElementById('generateBtn').disabled = false;
+            }
+        }
+
+        function copyToClipboard() {
+            const charData = {
+                name: document.getElementById('name').value,
+                description: document.getElementById('description').value,
+                personality: document.getElementById('personality').value,
+                scenario: document.getElementById('scenario').value,
+                first_mes: document.getElementById('first_mes').value,
+                mes_example: document.getElementById('mes_example').value
+            };
+
+            const jsonString = JSON.stringify(charData, null, 2); // The '2' adds indentation for readability
+
+            navigator.clipboard.writeText(jsonString).then(() => {
+                document.getElementById('status').innerText = 'JSON copied to clipboard!';
+                document.getElementById('status').className = 'success';
+            }).catch(err => {
+                document.getElementById('status').innerText = 'Failed to copy: ' + err;
+                document.getElementById('status').className = 'error';
+            });
+        }
+    </script>
+</body>
+</html>
